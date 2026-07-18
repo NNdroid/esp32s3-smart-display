@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Terminal 控制台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container" id="login-view">
+        <h2>✨ 終端機登入</h2>
+        <div class="form-group">
+            <label>使用者名稱</label>
+            <input type="text" id="username" value="admin" disabled>
+        </div>
+        <div class="form-group">
+            <label>密碼</label>
+            <input type="password" id="password" placeholder="輸入密碼 (預設: admin)">
+        </div>
+        <button onclick="login()">登入控制台</button>
+        <div id="login-msg" class="msg error"></div>
+    </div>
+
+    <div class="container hidden" id="config-view">
+        <h2>🌐 狀態與設定</h2>
+
+        <div class="status-bar">
+            <div class="status-item"><span>IP 地址</span> <span class="status-value" id="val-ip">-</span></div>
+            <div class="status-item"><span>Wi-Fi 訊號</span> <span class="status-value" id="val-rssi">-</span></div>
+            <div class="status-item"><span>內部溫度</span> <span class="status-value" id="val-temp">-</span></div>
+            <div class="status-item"><span>環境氣壓</span> <span class="status-value" id="val-press">-</span></div>
+        </div>
+        <hr>
+
+        <div class="form-group">
+            <label>螢幕亮度: <span id="brightness-val" style="color: #60a5fa; font-weight: bold;">100</span>%</label>
+            <input type="range" id="brightness-slider" min="5" max="100" oninput="onBrightnessInput(this.value)">
+        </div>
+        <hr>
+
+        <div class="form-group">
+            <label>無線網路與顯示屏設定</label>
+            <button onclick="resetProvisioning()" class="btn-amber" style="margin-top: 6px;">⚠️ 重新配网 (Reset Wi-Fi)</button>
+            <div class="control-panel">
+                <h3 style="margin-bottom: 4px;">🖥️ 顯示屏遠端控制</h3>
+                <button onclick="triggerAction('/api/action/switch_face')">
+                    🔄 切換下一表盤
+                </button>
+                <button onclick="triggerAction('/api/action/switch_stock')" class="btn-slate">
+                    📈 切換下一股票
+                </button>
+            </div>
+        </div>
+        <hr>
+
+        <div class="form-group">
+            <label>股票顯示方式</label>
+            <select id="chart-mode">
+                <option value="0">📈 1分鐘折線圖 (極速分時)</option>
+                <option value="1">📊 15分鐘蠟燭圖 (專業中線)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>股票代碼清單 (每行一個)</label>
+            <textarea id="stock-list" rows="5" placeholder="例如:&#10;AAPL&#10;TSLA&#10;0700.HK"></textarea>
+        </div>
+        <button onclick="saveStocks()">保存股票配置</button>
+        <div id="action-stock-msg" class="msg"></div>
+
+        <div class="form-group" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+            <label>固件升級 (OTA Update)</label>
+            <input type="file" id="ota-file" accept=".bin" style="padding: 10px; background: rgba(0,0,0,0.15);">
+            <button onclick="performOTA()" class="btn-purple" style="margin-top: 12px;">⚡ 開始固件升級</button>
+        </div>
+
+        <hr>
+
+        <h4>修改管理員密碼</h4>
+        <div class="form-group">
+            <input type="password" id="old-pwd" placeholder="目前密碼">
+        </div>
+        <div class="form-group">
+            <input type="password" id="new-pwd" placeholder="新密碼">
+        </div>
+        <button onclick="changePwd()" class="btn-slate">更新控制台密碼</button>
+        <div id="action-pwd-msg" class="msg"></div>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <p id="modal-msg"></p>
+            <div class="modal-buttons">
+                <button id="modal-btn-cancel" class="btn-cancel hidden">取消</button>
+                <button id="modal-btn-ok" class="btn-ok">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_HEADERS = () => ({
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        });
+
+        // 初始化檢查
+        window.onload = () => {
+            document.getElementById('custom-modal').classList.add('hidden');
+            if (localStorage.getItem('token')) {
+                showView('config-view');
+                loadData();
+            } else {
+                showView('login-view');
+            }
+        };
+
+        // --- 自訂彈窗核心邏輯 ---
+        function showCustomModal(msg, isConfirm) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('custom-modal');
+                const msgEl = document.getElementById('modal-msg');
+                const btnOk = document.getElementById('modal-btn-ok');
+                const btnCancel = document.getElementById('modal-btn-cancel');
+
+                msgEl.innerText = msg;
+                overlay.classList.remove('hidden');
+
+                if (isConfirm) {
+                    btnCancel.classList.remove('hidden');
+                } else {
+                    btnCancel.classList.add('hidden');
+                }
+
+                const cleanup = (result) => {
+                    overlay.classList.add('hidden');
+                    btnOk.onclick = null;
+                    btnCancel.onclick = null;
+                    resolve(result);
+                };
+
+                btnOk.onclick = () => cleanup(true);
+                btnCancel.onclick = () => cleanup(false);
+            });
+        }
+
+        const customAlert = (msg) => showCustomModal(msg, false);
+        const customConfirm = (msg) => showCustomModal(msg, true);
+
+        function showView(id) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('config-view').classList.add('hidden');
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function showMsg(id, text, isError = false) {
+            const el = document.getElementById(id);
+            el.innerText = text;
+            el.style.color = isError ? 'var(--accent-rose)' : 'var(--accent-emerald)';
+            setTimeout(() => el.innerText = '', 3000);
+        }
+
+        async function login() {
+            const password = document.getElementById('password').value;
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password })
+                });
+                const data = await res.json();
+                if (res.ok && data.token) {
+                    localStorage.setItem('token', data.token);
+                    showView('config-view');
+                    loadData();
+                } else {
+                    showMsg('login-msg', data.msg || '登入失敗', true);
+                }
+            } catch (e) {
+                showMsg('login-msg', '設備連線失敗', true);
+            }
+        }
+
+        async function loadData() {
+            try {
+                const resSettings = await fetch('/api/settings', { headers: API_HEADERS() });
+                if (resSettings.ok) {
+                    const settings = await resSettings.json();
+                    const slider = document.getElementById('brightness-slider');
+                    const label = document.getElementById('brightness-val');
+                    slider.value = settings.brightness;
+                    label.innerText = settings.brightness;
+                }
+
+                const resStatus = await fetch('/api/status', { headers: API_HEADERS() });
+                if (resStatus.status === 401) {
+                    showMsg('login-msg', '⚠️ 登入已過期或設備重啟，請重新登入', true);
+                    showView('login-view');
+                    return;
+                }
+                const status = await resStatus.json();
+                document.getElementById('val-ip').innerText = status.ip + (status.ip6 ? ' / ' + status.ip6 : '');
+                document.getElementById('val-rssi').innerText = status.rssi;
+                document.getElementById('val-temp').innerText = status.temp + ' °C';
+                document.getElementById('val-press').innerText = status.press + ' hPa';
+
+                const resStocks = await fetch('/api/stocks', { headers: API_HEADERS() });
+                const resStocksJson = await resStocks.json();
+                document.getElementById('stock-list').value = resStocksJson.stocks.join('\n');
+                document.getElementById('chart-mode').value = resStocksJson.chartMode ?? 0;
+            } catch (e) {
+                console.error("讀取數據失敗", e);
+            }
+        }
+
+        async function saveStocks() {
+            const lines = document.getElementById('stock-list').value.split('\n').map(s => s.trim()).filter(s => s);
+            const chartMode = document.getElementById('chart-mode').value ?? 0;
+            try {
+                const res = await fetch('/api/stocks', {
+                    method: 'POST',
+                    headers: API_HEADERS(),
+                    body: JSON.stringify({ stocks: lines, chartMode })
+                });
+                if (res.ok) showMsg('action-stock-msg', '✅ 股票清單已保存並觸發刷新');
+                else if (res.status === 401) logout();
+            } catch (e) {
+                showMsg('action-stock-msg', '❌ 保存失敗', true);
+            }
+        }
+
+        async function changePwd() {
+            const old_password = document.getElementById('old-pwd').value;
+            const new_password = document.getElementById('new-pwd').value;
+            if (!old_password || !new_password) return showMsg('action-pwd-msg', '請輸入完整密碼', true);
+
+            try {
+                const res = await fetch('/api/password', {
+                    method: 'POST',
+                    headers: API_HEADERS(),
+                    body: JSON.stringify({ old_password, new_password })
+                });
+                if (res.ok) {
+                    customAlert('密碼修改成功，請重新登入！');
+                    logout();
+                } else {
+                    const data = await res.json();
+                    showMsg('action-pwd-msg', data.msg || '修改失敗', true);
+                }
+            } catch (e) {
+                showMsg('action-pwd-msg', '❌ 修改失敗', true);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            document.getElementById('password').value = '';
+            showView('login-view');
+        }
+
+        async function resetProvisioning() {
+            if (!await customConfirm("確定要清除 Wi-Fi 設定並重新配網嗎？\n設備將會重啟並斷開當前連線！")) {
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/reset_wifi', {
+                    method: 'POST',
+                    headers: API_HEADERS()
+                });
+
+                if (res.ok) {
+                    customAlert("✅ 指令已發送！設備即將重啟進入配網模式。\n請查看設備螢幕獲取新的 PIN 碼。");
+                } else {
+                    customAlert("❌ 操作失敗");
+                }
+            } catch (e) {
+                customAlert("❌ 網路錯誤");
+            }
+        }
+
+        let brightnessTimeout = null;
+        function onBrightnessInput(value) {
+            document.getElementById('brightness-val').innerText = value;
+            if (brightnessTimeout) clearTimeout(brightnessTimeout);
+            brightnessTimeout = setTimeout(async () => {
+                try {
+                    await fetch('/api/brightness', {
+                        method: 'POST',
+                        headers: API_HEADERS(),
+                        body: JSON.stringify({ brightness: parseInt(value) })
+                    });
+                } catch (e) {
+                    console.error("亮度調節失敗", e);
+                }
+            }, 300);
+        }
+
+        async function performOTA() {
+            const file = document.getElementById('ota-file').files[0];
+            if (!file) return customAlert("請選擇固件檔案 (.bin)");
+
+            if (!await customConfirm("確認升級固件？\n升級過程中請勿斷電！")) return;
+
+            try {
+                const res = await fetch('/api/ota', {
+                    method: 'POST',
+                    headers: { 'Authorization': API_HEADERS().Authorization },
+                    body: file
+                });
+                if (res.ok) customAlert("✅ 正在升級，設備即將自動重啟...");
+            } catch (e) {
+                customAlert("❌ OTA 升級失敗");
+            }
+        }
+
+        function triggerAction(url) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    console.log("執行成功:", data);
+                })
+                .catch(error => {
+                    console.error("執行失敗:", error);
+                    alert("設備離線或請求失敗！");
+                });
+        }
+    </script>
+</body>
+
+</html>

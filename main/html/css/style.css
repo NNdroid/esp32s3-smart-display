@@ -1,0 +1,409 @@
+:root {
+    --bg-gradient-1: #0f172a;
+    --bg-gradient-2: #1e1b4b;
+    --bg-gradient-3: #311042;
+    --bg-gradient-4: #0c4a6e;
+    
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-bg-hover: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-border-highlight: rgba(255, 255, 255, 0.35);
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    
+    --accent-blue: #3b82f6;
+    --accent-indigo: #6366f1;
+    --accent-purple: #a855f7;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    
+    --shadow-glass: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--glass-border);
+    --shadow-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================
+   動態流體極光背景 (Liquid Aurora Background)
+   ========================================== */
+body {
+    background: linear-gradient(-45deg, var(--bg-gradient-1), var(--bg-gradient-2), var(--bg-gradient-3), var(--bg-gradient-4));
+    background-size: 400% 400%;
+    animation: liquidAurora 18s ease-in-out infinite;
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* 懸浮光斑光學渲染 */
+body::before, body::after {
+    content: '';
+    position: fixed;
+    width: 350px;
+    height: 350px;
+    border-radius: 50%;
+    filter: blur(90px);
+    z-index: -1;
+    animation: floatOrb 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body::before {
+    background: radial-gradient(circle, var(--accent-indigo) 0%, rgba(99, 102, 241, 0) 70%);
+    top: -10%;
+    left: -10%;
+}
+
+body::after {
+    background: radial-gradient(circle, var(--accent-purple) 0%, rgba(168, 85, 247, 0) 70%);
+    bottom: -10%;
+    right: -10%;
+    animation-delay: -10s;
+}
+
+@keyframes liquidAurora {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes floatOrb {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(60px, 80px) scale(1.2); }
+}
+
+/* ==========================================
+   主體琉璃卡片 (Liquid Glass Container)
+   ========================================== */
+.container {
+    background: var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-border-highlight);
+    border-radius: 28px;
+    padding: 32px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: var(--shadow-glass), var(--shadow-inner);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.container:hover {
+    box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--glass-border-highlight), var(--shadow-inner);
+}
+
+h2, h3, h4 {
+    text-align: center;
+    margin-top: 0;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+h2 { font-size: 24px; margin-bottom: 24px; }
+h3 { font-size: 18px; margin-bottom: 14px; }
+h4 { font-size: 16px; margin-top: 20px; margin-bottom: 14px; }
+
+hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    margin: 28px 0;
+}
+
+/* ==========================================
+   表單與控制項 (Form Inputs & Selects)
+   ========================================== */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+input[type="text"], 
+input[type="password"], 
+textarea, 
+select {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-primary);
+    border-radius: 16px;
+    box-sizing: border-box;
+    font-size: 15px;
+    font-family: inherit;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--accent-blue);
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input:disabled {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+textarea {
+    resize: vertical;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+    line-height: 1.5;
+}
+
+select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+}
+
+select option {
+    background-color: #1e293b;
+    color: white;
+}
+
+/* ==========================================
+   按鍵系統 (Liquid Pill Buttons)
+   ========================================== */
+button {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo));
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 20px -6px rgba(99, 102, 241, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+button::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: 0.5s;
+}
+
+button:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 12px 25px -4px rgba(99, 102, 241, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+button:hover::after { left: 100%; }
+button:active { transform: translateY(0) scale(0.98); }
+
+/* 色彩按鍵變體 (Color Variants) */
+.btn-emerald {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 8px 20px -6px rgba(16, 185, 129, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+.btn-emerald:hover { box-shadow: 0 12px 25px -4px rgba(16, 185, 129, 0.6); }
+
+.btn-amber {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    box-shadow: 0 8px 20px -6px rgba(245, 158, 11, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+.btn-amber:hover { box-shadow: 0 12px 25px -4px rgba(245, 158, 11, 0.6); }
+
+.btn-purple {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    box-shadow: 0 8px 20px -6px rgba(168, 85, 247, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+.btn-purple:hover { box-shadow: 0 12px 25px -4px rgba(168, 85, 247, 0.6); }
+
+.btn-slate {
+    background: linear-gradient(135deg, #334155, #475569);
+    box-shadow: 0 8px 20px -6px rgba(71, 85, 105, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+.btn-slate:hover { box-shadow: 0 12px 25px -4px rgba(71, 85, 105, 0.6); }
+
+.control-panel {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 18px;
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ==========================================
+   狀態監視組件 (iOS Widget Grid)
+   ========================================== */
+.status-bar {
+    display: grid;
+    grid-template-columns: 1fr minmax(0, 1fr);
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.status-item {
+    min-width: 0;       /* 💡 核心指令：打破 Flex/Grid 子元素的最小內容寬度保護 */
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px;
+    border-radius: 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.status-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.status-value {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    word-wrap: break-word;
+}
+
+/* ==========================================
+   iOS 晶瑩滑塊 (Apple Liquid Slider)
+   ========================================== */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    padding: 8px 0;
+}
+
+input[type=range]:focus { outline: none; }
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 10px;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+}
+
+input[type=range]::-webkit-slider-thumb {
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(255, 255, 255, 0.2);
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.4);
+}
+
+/* ==========================================
+   系統消息與彈窗 (Liquid Glass Modals)
+   ========================================== */
+.hidden { display: none !important; }
+.msg { text-align: center; font-size: 14px; margin-top: 12px; height: 20px; font-weight: 500;}
+.error { color: var(--accent-rose); text-shadow: 0 0 8px rgba(244, 63, 94, 0.4); }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-box {
+    background: rgba(30, 41, 59, 0.75);
+    backdrop-filter: blur(35px) saturate(200%);
+    -webkit-backdrop-filter: blur(35px) saturate(200%);
+    border: 1px solid var(--glass-border-highlight);
+    border-radius: 28px;
+    padding: 30px;
+    width: 85%;
+    max-width: 340px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+    text-align: center;
+    animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#modal-msg {
+    color: var(--text-primary);
+    margin-top: 0;
+    margin-bottom: 24px;
+    font-size: 16px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    font-weight: 500;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-ok { background: linear-gradient(135deg, var(--accent-blue), var(--accent-indigo)); }
+.btn-cancel { background: linear-gradient(135deg, #475569, #334155); }
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
