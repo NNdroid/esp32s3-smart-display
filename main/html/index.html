@@ -30,63 +30,124 @@
         <div class="status-bar">
             <div class="status-item"><span>IP 地址</span> <span class="status-value" id="val-ip">-</span></div>
             <div class="status-item"><span>Wi-Fi 訊號</span> <span class="status-value" id="val-rssi">-</span></div>
-            <div class="status-item"><span>內部溫度</span> <span class="status-value" id="val-temp">-</span></div>
-            <div class="status-item"><span>環境氣壓</span> <span class="status-value" id="val-press">-</span></div>
+            <div class="status-item" id="item-temp"><span>內部溫度</span> <span class="status-value" id="val-temp">-</span></div>
+            <div class="status-item" id="item-hum"><span>內部濕度</span> <span class="status-value" id="val-hum">-</span></div>
+            <div class="status-item" id="item-press"><span>環境氣壓</span> <span class="status-value" id="val-press">-</span></div>
+            <div class="status-item"><span>電池電量</span> <span class="status-value" id="val-battery">-</span></div>
         </div>
-        <hr>
-
-        <div class="form-group">
-            <label>螢幕亮度: <span id="brightness-val" style="color: #60a5fa; font-weight: bold;">100</span>%</label>
-            <input type="range" id="brightness-slider" min="5" max="100" oninput="onBrightnessInput(this.value)">
-        </div>
-        <hr>
-
-        <div class="form-group">
-            <label>無線網路與顯示屏設定</label>
-            <button onclick="resetProvisioning()" class="btn-amber" style="margin-top: 6px;">⚠️ 重新配网 (Reset Wi-Fi)</button>
-            <div class="control-panel">
-                <h3 style="margin-bottom: 4px;">🖥️ 顯示屏遠端控制</h3>
-                <button onclick="triggerAction('/api/action/switch_face')">
-                    🔄 切換下一表盤
-                </button>
-                <button onclick="triggerAction('/api/action/switch_stock')" class="btn-slate">
-                    📈 切換下一股票
-                </button>
+        <div class="card-panel">
+            <div class="card-title">💡 顯示與電池設定</div>
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label>螢幕亮度: <span id="brightness-val" style="color: #60a5fa; font-weight: bold;">100</span>%</label>
+                <input type="range" id="brightness-slider" min="5" max="100" oninput="onBrightnessInput(this.value)">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>電池顯示設定</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="bat-style-select" onchange="updateBatteryConfig()" style="flex: 1;">
+                        <option value="0">電池圖標</option>
+                        <option value="1">數字電量</option>
+                    </select>
+                    <select id="bat-pos-select" onchange="updateBatteryConfig()" style="flex: 1;">
+                        <option value="0">左上角</option>
+                        <option value="1">右上角</option>
+                        <option value="2">左下角</option>
+                        <option value="3">右下角</option>
+                    </select>
+                </div>
             </div>
         </div>
-        <hr>
 
-        <div class="form-group">
-            <label>股票顯示方式</label>
-            <select id="chart-mode">
-                <option value="0">📈 1分鐘折線圖 (極速分時)</option>
-                <option value="1">📊 15分鐘蠟燭圖 (專業中線)</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>股票代碼清單 (每行一個)</label>
-            <textarea id="stock-list" rows="5" placeholder="例如:&#10;AAPL&#10;TSLA&#10;0700.HK"></textarea>
-        </div>
-        <button onclick="saveStocks()">保存股票配置</button>
-        <div id="action-stock-msg" class="msg"></div>
-
-        <div class="form-group" style="margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-            <label>固件升級 (OTA Update)</label>
-            <input type="file" id="ota-file" accept=".bin" style="padding: 10px; background: rgba(0,0,0,0.15);">
-            <button onclick="performOTA()" class="btn-purple" style="margin-top: 12px;">⚡ 開始固件升級</button>
+        <div class="card-panel">
+            <div class="card-title">🌐 OpenWrt 流量表盤設定</div>
+            <div class="form-group">
+                <label>流量数据 JSON API 链接</label>
+                <input type="text" id="openwrt-url" placeholder="留空使用默认: http://192.168.100.1/traffic.json">
+            </div>
+            <button onclick="updateOpenwrtUrl()">💾 保存 OpenWrt 配置</button>
+            <div id="action-openwrt-msg" class="msg"></div>
         </div>
 
-        <hr>
+        <div class="card-panel">
+            <div class="card-title">📡 MQTT 图像推送表盘设定 <span id="mqtt-status-badge" style="font-size: 12px; margin-left: 10px; padding: 2px 6px; border-radius: 4px; background: var(--surface-light); color: var(--text-muted);">状态: 未知</span></div>
+            <div class="form-group">
+                <label>Broker URL</label>
+                <input type="text" id="mqtt-url" placeholder="留空则关闭 MQTT 图像接收功能">
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.4;">
+                    支持的协议格式例子：<br>
+                    • TCP 直连: <b>mqtt://192.168.1.100:1883</b><br>
+                    • WebSocket: <b>ws://192.168.1.100:80/mqtt</b><br>
+                    <span style="color: var(--accent-emerald);">✅ 已挂载全球 CA 根证书，完美支持 mqtts:// 和 wss:// 加密连接</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>订阅 Topic</label>
+                <input type="text" id="mqtt-topic" placeholder="默认: smart-display/image">
+            </div>
+            <div class="form-group">
+                <label>Username (留空表示无密码)</label>
+                <input type="text" id="mqtt-user">
+            </div>
+            <div class="form-group">
+                <label>Password (留空表示无密码)</label>
+                <input type="password" id="mqtt-pwd">
+            </div>
+            <button onclick="updateMqttConfig()">💾 保存 MQTT 配置</button>
+            <div id="action-mqtt-msg" class="msg"></div>
+        </div>
 
-        <h4>修改管理員密碼</h4>
-        <div class="form-group">
-            <input type="password" id="old-pwd" placeholder="目前密碼">
+        <div class="card-panel">
+            <div class="card-title">🎮 遠端控制</div>
+            <button onclick="triggerAction('/api/action/switch_face')" style="margin-bottom: 12px;">
+                🔄 切換下一表盤
+            </button>
+            <button onclick="triggerAction('/api/action/switch_stock')" class="btn-slate" style="margin-bottom: 12px;">
+                📈 切換下一股票
+            </button>
+            <button onclick="triggerAction('/api/action/restart')" class="btn-amber" style="margin-bottom: 12px;">
+                🔌 重啟設備 (Reboot)
+            </button>
+            <button onclick="resetProvisioning()" class="btn-rose">
+                ⚠️ 重新配网 (Reset Wi-Fi)
+            </button>
         </div>
-        <div class="form-group">
-            <input type="password" id="new-pwd" placeholder="新密碼">
+
+        <div class="card-panel">
+            <div class="card-title">📈 股票設定</div>
+            <div class="form-group">
+                <label>股票顯示方式</label>
+                <select id="chart-mode">
+                    <option value="0">📈 1分鐘折線圖 (極速分时)</option>
+                    <option value="1">📊 15分鐘蠟燭圖 (專業中線)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>股票代碼清單 (每行一個)</label>
+                <textarea id="stock-list" rows="5" placeholder="例如:&#10;AAPL&#10;TSLA&#10;0700.HK"></textarea>
+            </div>
+            <button onclick="saveStocks()">💾 保存股票配置</button>
+            <div id="action-stock-msg" class="msg"></div>
         </div>
-        <button onclick="changePwd()" class="btn-slate">更新控制台密碼</button>
-        <div id="action-pwd-msg" class="msg"></div>
+
+        <div class="card-panel">
+            <div class="card-title">⚙️ 系統管理</div>
+            <div class="form-group">
+                <label>固件升級 (OTA Update)</label>
+                <input type="file" id="ota-file" accept=".bin" style="padding: 10px; background: rgba(0,0,0,0.15);">
+                <button onclick="performOTA()" class="btn-purple" style="margin-top: 12px;">⚡ 開始固件升級</button>
+                <div id="ota-progress-container" style="display: none; margin-top: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                    <div id="ota-progress-bar" style="width: 0%; height: 16px; background: var(--accent-emerald); transition: width 0.2s;"></div>
+                </div>
+                <div id="ota-progress-text" style="font-size: 12px; margin-top: 4px; text-align: right; color: var(--text-muted); display: none;">0%</div>
+            </div>
+            <div class="form-group" style="margin-top: 24px;">
+                <label>修改管理員密碼</label>
+                <input type="password" id="old-pwd" placeholder="目前密碼" style="margin-bottom: 12px;">
+                <input type="password" id="new-pwd" placeholder="新密碼" style="margin-bottom: 12px;">
+                <button onclick="changePwd()" class="btn-slate">更新控制台密碼</button>
+                <div id="action-pwd-msg" class="msg"></div>
+            </div>
+        </div>
     </div>
 
     <div id="custom-modal" class="modal-overlay hidden">
@@ -191,6 +252,14 @@
                     const label = document.getElementById('brightness-val');
                     slider.value = settings.brightness;
                     label.innerText = settings.brightness;
+                    
+                    if (settings.bat_style !== undefined) document.getElementById('bat-style-select').value = settings.bat_style;
+                    if (settings.bat_pos !== undefined) document.getElementById('bat-pos-select').value = settings.bat_pos;
+                    if (settings.openwrt_url !== undefined) document.getElementById('openwrt-url').value = settings.openwrt_url;
+                    
+                    if (settings.mqtt_url !== undefined) document.getElementById('mqtt-url').value = settings.mqtt_url;
+                    if (settings.mqtt_topic !== undefined) document.getElementById('mqtt-topic').value = settings.mqtt_topic;
+                    if (settings.mqtt_user !== undefined) document.getElementById('mqtt-user').value = settings.mqtt_user;
                 }
 
                 const resStatus = await fetch('/api/status', { headers: API_HEADERS() });
@@ -200,10 +269,31 @@
                     return;
                 }
                 const status = await resStatus.json();
-                document.getElementById('val-ip').innerText = status.ip + (status.ip6 ? ' / ' + status.ip6 : '');
+                document.getElementById('val-ip').innerText = `${status.ip} / ${status.ip6}`;
                 document.getElementById('val-rssi').innerText = status.rssi;
-                document.getElementById('val-temp').innerText = status.temp + ' °C';
-                document.getElementById('val-press').innerText = status.press + ' hPa';
+                document.getElementById('val-battery').innerText = `${status.battery}% (${status.bat_mv}mV)`;
+                
+                if (status.has_sensor) {
+                    document.getElementById('item-temp').style.display = 'flex';
+                    document.getElementById('item-hum').style.display = 'flex';
+                    document.getElementById('item-press').style.display = 'flex';
+                    document.getElementById('val-temp').innerText = `${status.temp.toFixed(1)}°C`;
+                    document.getElementById('val-hum').innerText = `${status.hum.toFixed(1)}%`;
+                    document.getElementById('val-press').innerText = `${status.press.toFixed(1)}hPa`;
+                } else {
+                    document.getElementById('item-temp').style.display = 'none';
+                    document.getElementById('item-hum').style.display = 'none';
+                    document.getElementById('item-press').style.display = 'none';
+                }
+
+                const mqttBadge = document.getElementById('mqtt-status-badge');
+                if (status.mqtt_connected) {
+                    mqttBadge.innerText = '✅ 已连接';
+                    mqttBadge.style.color = 'var(--accent-emerald)';
+                } else {
+                    mqttBadge.innerText = '❌ 未连接';
+                    mqttBadge.style.color = 'var(--accent-rose)';
+                }
 
                 const resStocks = await fetch('/api/stocks', { headers: API_HEADERS() });
                 const resStocksJson = await resStocks.json();
@@ -213,6 +303,49 @@
                 console.error("讀取數據失敗", e);
             }
         }
+        
+        async function fetchStatusOnly() {
+            try {
+                const resStatus = await fetch('/api/status', { headers: API_HEADERS() });
+                if (resStatus.ok) {
+                    const status = await resStatus.json();
+                    document.getElementById('val-ip').innerText = `${status.ip} / ${status.ip6}`;
+                    document.getElementById('val-rssi').innerText = status.rssi;
+                    document.getElementById('val-battery').innerText = `${status.battery}% (${status.bat_mv}mV)`;
+                    
+                    if (status.has_sensor) {
+                        document.getElementById('item-temp').style.display = 'flex';
+                        document.getElementById('item-hum').style.display = 'flex';
+                        document.getElementById('item-press').style.display = 'flex';
+                        document.getElementById('val-temp').innerText = `${status.temp.toFixed(1)}°C`;
+                        document.getElementById('val-hum').innerText = `${status.hum.toFixed(1)}%`;
+                        document.getElementById('val-press').innerText = `${status.press.toFixed(1)}hPa`;
+                    } else {
+                        document.getElementById('item-temp').style.display = 'none';
+                        document.getElementById('item-hum').style.display = 'none';
+                        document.getElementById('item-press').style.display = 'none';
+                    }
+                    
+                    const mqttBadge = document.getElementById('mqtt-status-badge');
+                    if (status.mqtt_connected) {
+                        mqttBadge.innerText = '✅ 已连接';
+                        mqttBadge.style.color = 'var(--accent-emerald)';
+                    } else {
+                        mqttBadge.innerText = '❌ 未连接';
+                        mqttBadge.style.color = 'var(--accent-rose)';
+                    }
+                }
+            } catch (e) {
+                console.error("Fetch status error");
+            }
+        }
+        
+        // 自动轮询状态 (每 5 秒一次)
+        setInterval(() => {
+            if (!document.getElementById('config-view').classList.contains('hidden')) {
+                fetchStatusOnly();
+            }
+        }, 5000);
 
         async function saveStocks() {
             const lines = document.getElementById('stock-list').value.split('\n').map(s => s.trim()).filter(s => s);
@@ -291,10 +424,76 @@
                         headers: API_HEADERS(),
                         body: JSON.stringify({ brightness: parseInt(value) })
                     });
-                } catch (e) {
-                    console.error("亮度調節失敗", e);
-                }
+                } catch (e) {}
             }, 300);
+        }
+
+        async function updateBatteryConfig() {
+            const style = parseInt(document.getElementById('bat-style-select').value);
+            const pos = parseInt(document.getElementById('bat-pos-select').value);
+            try {
+                await fetch('/api/settings/battery', {
+                    method: 'POST',
+                    headers: API_HEADERS(),
+                    body: JSON.stringify({ bat_style: style, bat_pos: pos })
+                });
+            } catch (e) {
+                console.error('Failed to update battery config', e);
+            }
+        }
+
+        async function updateOpenwrtUrl() {
+            const url = document.getElementById('openwrt-url').value.trim();
+            const msgEl = document.getElementById('action-openwrt-msg');
+            msgEl.innerText = "保存中...";
+            try {
+                const res = await fetch('/api/settings/openwrt', {
+                    method: 'POST',
+                    headers: API_HEADERS(),
+                    body: JSON.stringify({ url: url })
+                });
+                if (res.ok) {
+                    msgEl.innerText = "✅ 已保存 (若为空则自动恢复默认)";
+                    msgEl.style.color = "var(--accent-emerald)";
+                    setTimeout(() => loadData(), 1000); // Reload to show the actual saved value
+                } else {
+                    msgEl.innerText = "❌ 保存失敗";
+                    msgEl.style.color = "var(--accent-rose)";
+                }
+            } catch (e) {
+                msgEl.innerText = "❌ 網路錯誤";
+                msgEl.style.color = "var(--accent-rose)";
+            }
+            setTimeout(() => { msgEl.innerText = ""; }, 3000);
+        }
+
+        async function updateMqttConfig() {
+            const payload = {
+                url: document.getElementById('mqtt-url').value.trim(),
+                topic: document.getElementById('mqtt-topic').value.trim(),
+                user: document.getElementById('mqtt-user').value.trim(),
+                pwd: document.getElementById('mqtt-pwd').value.trim()
+            };
+            const msgEl = document.getElementById('action-mqtt-msg');
+            msgEl.innerText = "保存中...";
+            try {
+                const res = await fetch('/api/settings/mqtt', {
+                    method: 'POST',
+                    headers: API_HEADERS(),
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    msgEl.innerText = "✅ MQTT 配置已保存";
+                    msgEl.style.color = "var(--accent-emerald)";
+                } else {
+                    msgEl.innerText = "❌ 保存失败";
+                    msgEl.style.color = "var(--accent-rose)";
+                }
+            } catch (e) {
+                msgEl.innerText = "❌ 网络错误";
+                msgEl.style.color = "var(--accent-rose)";
+            }
+            setTimeout(() => { msgEl.innerText = ""; }, 3000);
         }
 
         async function performOTA() {
@@ -303,20 +502,53 @@
 
             if (!await customConfirm("確認升級固件？\n升級過程中請勿斷電！")) return;
 
-            try {
-                const res = await fetch('/api/ota', {
-                    method: 'POST',
-                    headers: { 'Authorization': API_HEADERS().Authorization },
-                    body: file
-                });
-                if (res.ok) customAlert("✅ 正在升級，設備即將自動重啟...");
-            } catch (e) {
-                customAlert("❌ OTA 升級失敗");
-            }
+            const progressContainer = document.getElementById('ota-progress-container');
+            const progressBar = document.getElementById('ota-progress-bar');
+            const progressText = document.getElementById('ota-progress-text');
+            
+            progressContainer.style.display = 'block';
+            progressText.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressText.innerText = '0%';
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/ota', true);
+            xhr.setRequestHeader('Authorization', API_HEADERS().Authorization);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percentComplete + '%';
+                    progressText.innerText = percentComplete + '% (上傳中...)';
+                    if (percentComplete === 100) {
+                        progressText.innerText = '100% (正在刷寫 Flash，請稍候...)';
+                    }
+                }
+            };
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    progressText.innerText = '✅ 升級成功！設備即將重啟';
+                    progressBar.style.background = 'var(--accent-emerald)';
+                    setTimeout(() => customAlert("✅ 正在升級，設備即將自動重啟..."), 500);
+                } else {
+                    progressText.innerText = '❌ 升級失敗';
+                    progressBar.style.background = 'var(--accent-rose)';
+                    customAlert("❌ OTA 升級失敗: " + xhr.statusText);
+                }
+            };
+
+            xhr.onerror = function() {
+                progressText.innerText = '❌ 網路錯誤';
+                progressBar.style.background = 'var(--accent-rose)';
+                customAlert("❌ OTA 升級失敗，網路錯誤");
+            };
+
+            xhr.send(file);
         }
 
         function triggerAction(url) {
-            fetch(url)
+            fetch(url, { headers: API_HEADERS() })
                 .then(response => response.json())
                 .then(data => {
                     console.log("執行成功:", data);

@@ -28,67 +28,74 @@
 #define BME280_I2C_CLOCK_HZ    100000
 #define BUZZER_PIN             2
 
+#define CHRG_STATUS_PIN GPIO_NUM_4
+
 // =========================================================
 // 🎨 ESP32 / LCD (專屬通道適配版) 終極標準調色盤宏定義
 // =========================================================
 
-// --- Tier 2：中亮色 (成交量柱狀圖專用 - 不干擾主線，但清晰可見) ---
-#define COLOR_VOL_RED          0xB000  // 70% 亮度紅 (中紅)
-#define COLOR_VOL_GREEN        0x0016  // 70% 亮度綠 (中綠) [完美契合你的硬體]
-#define COLOR_VOL_BLUE         0x0500  // 70% 亮度藍 (中藍) [完美契合你的硬體]
+// 由於你的硬體屏幕像素排列為特殊的 RBG565 (Red=高5位, Blue=中6位, Green=低5位)
+// 我們定義一個專屬的巨集，將標準 RGB(888) 自動轉換為適配你硬體的 RBG565
+#define RBG565(r, g, b) ((((r) & 0xF8) << 8) | (((b) & 0xFC) << 3) | (((g) & 0xF8) >> 3))
 
-// --- Tier 3：極暗微光色 (分時圖背景網點陰影 / 副圖底板專用) ---
-#define COLOR_SHADOW_RED       0x3800  // 22% 極暗紅 (僅作淡淡的紅暈底色)
-#define COLOR_SHADOW_GREEN     0x0007  // 22% 極暗綠 (僅作淡淡的綠暈底色) [完美契合你的硬體]
-#define COLOR_SHADOW_BLUE      0x0180  // 22% 極暗藍 (適合副圖底板或微光網格) [完美契合你的硬體]
+// --- 1. 基礎與經典純色 (Basic Colors) ---
+#define COLOR_BLACK            RBG565(0, 0, 0)
+#define COLOR_WHITE            RBG565(255, 255, 255)
+#define COLOR_RED              RBG565(255, 0, 0)
+#define COLOR_GREEN            RBG565(0, 255, 0)
+#define COLOR_BLUE             RBG565(0, 0, 255)
+#define COLOR_YELLOW           RBG565(255, 255, 0)
+#define COLOR_CYAN             RBG565(0, 255, 255)
+#define COLOR_MAGENTA          RBG565(255, 0, 255)
 
-// --- 1. 基礎與經典純色 (Basic Colors - 嚴格適配你的通道) ---
-#define COLOR_BLACK            0x0000  // 純黑 (背景/屏幕清除)
-#define COLOR_WHITE            0xFFFF  // 純白 (主標題/重要文本)
-#define COLOR_RED              0xF800  // 純紅 (歐美 K線陰線/警告提示)
-#define COLOR_GREEN            0x001F  // 純綠 (歐美 K線陽線/成功提示) [完美契合你的硬體]
-#define COLOR_BLUE             0x07E0  // 純藍 (藍色狀態/IPv6鏈示) [完美契合你的硬體]
-#define COLOR_YELLOW           0xF81F  // 純黃 (重要數值/日期線/均線) [重新映射]
-#define COLOR_CYAN             0x07FF  // 青色/藍綠 (HUD邊框/氣象數據)
-#define COLOR_MAGENTA          0xF81F  // 洋紅/紫紅 (特殊標籤/均線)
+// --- 2. 股票 K線與技術指標專用色 ---
+#define COLOR_ORANGE           RBG565(255, 165, 0)
+#define COLOR_PURPLE           RBG565(128, 0, 128)
+#define COLOR_VIOLET           RBG565(238, 130, 238)
+#define COLOR_PINK             RBG565(255, 192, 203)
+#define COLOR_GOLD             RBG565(255, 215, 0)
+#define COLOR_BROWN            RBG565(165, 42, 42)
+#define COLOR_DARK_RED         RBG565(139, 0, 0)
+#define COLOR_DARK_GREEN       RBG565(0, 100, 0)
+#define COLOR_DARK_BLUE        RBG565(0, 0, 139)
+#define COLOR_VOL_RED          RBG565(180, 0, 0)
+#define COLOR_VOL_GREEN        RBG565(0, 180, 0)
+#define COLOR_VOL_BLUE         RBG565(0, 0, 180)
 
-// --- 2. 股票 K線與技術指標專用色 (Financial & MA Lines) ---
-#define COLOR_ORANGE           0xFC1F  // 亮橘色 (極佳！適合 MA5 均線) [重新映射]
-#define COLOR_PURPLE           0x8010  // 深紫色 (適合 MA10 均線)
-#define COLOR_VIOLET           0x901A  // 紫羅蘭 (亮紫，適合 MA20 均線)
-#define COLOR_PINK             0xFC10  // 粉紅色 (適合 MA30/MA60 均線) [重新映射]
-#define COLOR_GOLD             0xFC0F  // 金黃色 (高亮焦點代碼/金牌提示) [重新映射]
-#define COLOR_BROWN            0xA145  // 棕色 (副圖分割或次要圖表線)
-#define COLOR_DARK_RED         0x7800  // 暗紅 (K線成交量柱-跌/陰影底色)
-#define COLOR_DARK_GREEN       0x000F  // 暗綠 (K線成交量柱-漲/陰影底色) [完美契合你的硬體]
-#define COLOR_DARK_BLUE        0x0400  // 暗藍 (副圖底色) [完美契合你的硬體]
+// --- 3. 現代 UI 灰階與網格線 ---
+#define COLOR_LIGHT_GRAY       RBG565(211, 211, 211)
+#define COLOR_GRAY             RBG565(128, 128, 128)
+#define COLOR_DARK_GRAY        RBG565(64, 64, 64)
+#define COLOR_GRID             RBG565(40, 40, 40)
+#define COLOR_OPEN_LINE        RBG565(90, 90, 90)
+#define COLOR_TEXT_BG          RBG565(20, 20, 80)
 
-// --- 3. 現代 UI 灰階與網格線 (Grayscale & Grids) ---
-#define COLOR_LIGHT_GRAY       0xD6BA  // 淺灰 (次要文本/副標題)
-#define COLOR_GRAY             0x6B6D  // 中灰 (一般標籤/非活動按鍵)
-#define COLOR_DARK_GRAY        0x3186  // 暗灰 (次要網格/刻度線)
-#define COLOR_GRID             0x2945  // 深度背景網格線 (極暗灰，不搶視覺) [使用你的原有數值]
-#define COLOR_OPEN_LINE        0x5A8B  // 昨收基準虛線 [使用你的原有數值]
-#define COLOR_TEXT_BG          0x1082  // 文本選中背景 [使用你的原有數值]
+// --- 4. iOS / 賽博朋克風 - 高階背景暗色 ---
+#define COLOR_CHARCOAL         RBG565(20, 20, 20)
+#define COLOR_SLATE_BG         RBG565(25, 35, 55)
+#define COLOR_NAVY_BG          RBG565(10, 20, 40)
+#define COLOR_WINE_BG          RBG565(40, 0, 0)
+#define COLOR_FOREST_BG        RBG565(0, 30, 0)
+#define COLOR_SHADOW_RED       RBG565(40, 0, 0)
+#define COLOR_SHADOW_GREEN     RBG565(0, 40, 0)
+#define COLOR_SHADOW_BLUE      RBG565(0, 0, 40)
 
-// --- 4. iOS / 賽博朋克風 - 高階背景暗色 (Dark Cards & Backgrounds) ---
-#define COLOR_CHARCOAL         0x1122  // 炭黑 (比純黑略暖，極佳的屏幕底色)
-#define COLOR_SLATE_BG         0x1947  // 板岩暗藍 (經典 iOS 卡片背景，如 OpenWrt 模塊底板)
-#define COLOR_NAVY_BG          0x0813  // 深海軍藍 (適合系統信息表盤背景)
-#define COLOR_WINE_BG          0x2800  // 暗酒紅背景 (適合報錯或警告彈窗底色)
-#define COLOR_FOREST_BG        0x000A  // 暗墨綠背景 (適合網絡連接正常時的底板) [重新映射]
-
-// --- 5. 亮眼霓虹與馬卡龍點綴色 (Neon & Accent Colors) ---
-#define COLOR_NEON_GREEN       0x03FF  // 螢光綠 (超亮！適合 Wi-Fi/Ping 極佳狀態) [重新映射]
-#define COLOR_NEON_PINK        0xF810  // 螢光粉 (適合警報/高亮焦點) [重新映射]
-#define COLOR_SKY_BLUE         0x05FF  // 天空藍 (天氣溫度/濕度顯示) [重新映射]
-#define COLOR_TEAL             0x0410  // 深青/湖水綠 (副標題裝飾線)
-#define COLOR_LIME             0x051F  // 萊姆綠 (活潑的提示色) [重新映射]
-#define COLOR_CORAL            0xF815  // 珊瑚紅 (溫和的警告色，不像純紅那麼刺眼) [重新映射]
+// --- 5. 亮眼霓虹與馬卡龍點綴色 ---
+#define COLOR_NEON_GREEN       RBG565(57, 255, 20)
+#define COLOR_NEON_PINK        RBG565(255, 20, 147)
+#define COLOR_SKY_BLUE         RBG565(135, 206, 235)
+#define COLOR_TEAL             RBG565(0, 128, 128)
+#define COLOR_LIME             RBG565(50, 205, 50)
+#define COLOR_CORAL            RBG565(255, 127, 80)
 
 // ==========================================
 // 🌍 全域變數 (供各模組共用)
 // ==========================================
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+extern TaskHandle_t g_main_task_handle;
+
 extern int s_stock_count;
 extern volatile int s_selected_stock;
 
@@ -101,8 +108,19 @@ extern int s_wifi_rssi;
 // ==========================================
 typedef enum {
     WATCH_FACE_STOCK = 0,
+    WATCH_FACE_SYSTEM, 
     WATCH_FACE_OPENWRT,
-    WATCH_FACE_SYSTEM
+    WATCH_FACE_MQTT_IMAGE,
+    WATCH_FACE_MAX
 } watch_face_t;
 
 extern watch_face_t g_current_face; 
+
+extern int g_bat_style; // 0 = 图标, 1 = 数字
+extern int g_bat_pos;   // 0 = 左上, 1 = 右上, 2 = 左下, 3 = 右下
+
+extern char g_openwrt_url[128];
+extern char g_mqtt_broker_url[128];
+extern char g_mqtt_topic[128];
+extern char g_mqtt_username[64];
+extern char g_mqtt_password[64];

@@ -8,8 +8,13 @@
 #include "syslog_redirect.h"
 #include "nvs_flash.h"
 #include "ble_prov.h"
+#include "mqtt_api.h"
 #include "buzzer.h"
 #include "app_actions.h"
+#include "battery.h"
+
+TaskHandle_t g_main_task_handle = NULL;
+
 #include "psa/crypto.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
@@ -29,11 +34,19 @@
 #include "esp_check.h"
 
 watch_face_t g_current_face = WATCH_FACE_STOCK;
+int g_bat_style = 0; // 0 = 图标, 1 = 数字
+int g_bat_pos = 1;   // 0 = 左上, 1 = 右上, 2 = 左下, 3 = 右下
+char g_openwrt_url[128] = "http://192.168.100.1/traffic.json";
+
+char g_mqtt_broker_url[128] = "";
+char g_mqtt_topic[128] = "smart-display/image";
+char g_mqtt_username[64] = "";
+char g_mqtt_password[64] = "";
 
 // ==========================================
-// 💡 靈敏度：既然是數值下降，建議設回 15~20 左右測試
+// 🌍 觸摸電容按鍵設定
 // ==========================================
-#define TOUCH_SENSITIVITY_PERCENT 15
+#define TOUCH_SENSITIVITY_PERCENT 20
 
 // ==========================================
 // 📈 表盤 1：股票走勢圖表盤 (完美整合分時折線與 K線，保障數據完整性)
@@ -441,9 +454,9 @@ void draw_openwrt_face(uint16_t *fb)
     // draw_string(fb, 42, 188, g_openwrt_data.ip6, COLOR_WHITE, COLOR_BLACK, 1);
     draw_scrolling_string(fb, 42, 188, g_openwrt_data.ip6, COLOR_YELLOW, COLOR_BLACK, 1, 215);
 
-    // ==========================================
-    // 5. 底部天气数据行
-    // ==========================================
+// ==========================================
+// 5. 底部天气数据行
+// ==========================================
     if (g_bme280_data.sensor_type != SENSOR_TYPE_NONE)
     {
         typedef struct
@@ -490,7 +503,24 @@ void draw_openwrt_face(uint16_t *fb)
 }
 
 // ==========================================
-// 📊 表盘 3：系统信息表盘
+// 📡 表盘 3：MQTT 图像接收表盘
+// ==========================================
+void draw_mqtt_image_face(uint16_t *fb) {
+    if (g_mqtt_image_too_large) {
+        draw_cn_string(fb, 20, 100, "图片太大 (Image too large)", COLOR_RED, COLOR_BLACK);
+        draw_cn_string(fb, 20, 120, "仅支持 240x240 RGB565 裸数据", COLOR_WHITE, COLOR_BLACK);
+    } else if (g_mqtt_image_ready && g_mqtt_image_buf != NULL) {
+        // 直接将 PSRAM 中的 RGB565 数据拷贝到显存
+        // 假设传输的数据是高低位反转的 (大端/小端)，如果颜色不对需要做 byteswap
+        memcpy(fb, g_mqtt_image_buf, 240 * 240 * 2);
+    } else {
+        draw_cn_string(fb, 40, 100, "等待 MQTT 图像推送...", COLOR_YELLOW, COLOR_BLACK);
+        draw_cn_string(fb, 40, 130, g_mqtt_topic, COLOR_CYAN, COLOR_BLACK);
+    }
+}
+
+// ==========================================
+// 📊 表盘 4：系统信息表盘
 // ==========================================
 void draw_system_face(uint16_t *fb)
 {
@@ -605,11 +635,14 @@ void touch_button_task(void *pvParameters)
             int32_t threshold_release = g_baseline - (g_baseline * (TOUCH_SENSITIVITY_PERCENT / 2) / 100);
 
             // 基準值緩慢跟蹤 (未按下且無劇烈下跌時)
-            if (!is_pressed && smooth_raw > (int32_t)(g_baseline - (g_baseline * 5 / 100)))
+            if (!is_pressed)
             {
-                if (abs((int32_t)g_baseline - smooth_raw) < (int32_t)(g_baseline * 3 / 100))
-                {
-                    g_baseline = (g_baseline * 99 + smooth_raw) / 100;
+                if (smooth_raw > (int32_t)g_baseline) {
+                    // 數值變大 (未觸摸方向的漂移)，較快跟蹤，防卡死
+                    g_baseline = (g_baseline * 19 + smooth_raw) / 20;
+                } else if (smooth_raw > (int32_t)(g_baseline - (g_baseline * 10 / 100))) {
+                    // 數值變小，但在 10% 以內 (非按壓的輕微環境漂移)，極慢跟蹤
+                    g_baseline = (g_baseline * 999 + smooth_raw) / 1000;
                 }
             }
 
@@ -619,8 +652,8 @@ void touch_button_task(void *pvParameters)
                 if (smooth_raw < threshold_press && (xTaskGetTickCount() - last_release_tick) > pdMS_TO_TICKS(150))
                 {
                     press_confirm_count++;
-                    // 💡 按下依然是 2 次確認 (30ms)，響應速度極快，毫無延遲感！
-                    if (press_confirm_count >= 2)
+                    // 💡 按下增加為 5 次確認 (約 75ms)，徹底過濾瞬間電氣噪聲誤報！
+                    if (press_confirm_count >= 5)
                     {
                         is_pressed = true;
                         press_start_tick = xTaskGetTickCount();
@@ -690,12 +723,15 @@ void touch_button_task(void *pvParameters)
 
 void app_main(void)
 {
+    g_main_task_handle = xTaskGetCurrentTaskHandle();
+    ESP_LOGI("MAIN", "啟動 ESP32-S3 Smart Display 專案...");
     //esp_log_level_set("*", ESP_LOG_NONE); // 关闭日志
     nvs_flash_init();
     load_current_face_from_nvs();
     psa_crypto_init();
     auth_init();
     buzzer_init(); // 蜂鸣器初始化
+    battery_init(); // 電池檢測
 
     setenv("TZ", "CST-8", 1);
     tzset();
@@ -731,17 +767,29 @@ void app_main(void)
     }
     else
     {
-        draw_string(fb, 20, 100, "Connecting Wi-Fi", COLOR_GREEN, COLOR_BLACK, 2);
-        graphics_flush_frame(fb);
-
         esp_wifi_set_mode(WIFI_MODE_STA);
         esp_wifi_start();
 
         // 💡 强启后关闭 Wi-Fi 休眠，确保 SLAAC (IPv6) 握手不漏包
         esp_wifi_set_ps(WIFI_PS_NONE);
     }
-    wait_for_wifi_connection();
-
+    
+    // 顯示 Loading 動畫與版本號，直到連上 Wi-Fi
+    int anim_frame = 0;
+    const char *spinners[] = {"[ - ]", "[ \\ ]", "[ | ]", "[ / ]"};
+    while (!is_wifi_connected()) {
+        memset(fb, 0, LCD_H_RES * LCD_V_RES * sizeof(uint16_t));
+        
+        draw_string(fb, 45, 90, "Connecting...", COLOR_ORANGE, COLOR_BLACK, 2);
+        draw_string(fb, 90, 130, spinners[anim_frame], COLOR_GREEN, COLOR_BLACK, 2);
+        
+        // 底部顯示版本資訊
+        draw_string(fb, 30, 210, "v1.2.0 (Smart Display)", COLOR_LIGHT_GRAY, COLOR_BLACK, 1);
+        
+        graphics_flush_frame(fb);
+        anim_frame = (anim_frame + 1) % 4;
+        vTaskDelay(pdMS_TO_TICKS(150));
+    }
     // ==========================================
     // 连上 Wi-Fi 后，立刻清空配网画面，显示加载中
     // ==========================================
@@ -781,6 +829,38 @@ void app_main(void)
 
     stock_api_init();
     openwrt_api_init();
+    
+    // Load battery configs
+    uint8_t style_tmp = 0;
+    if (nvs_load_u8("bat_style", &style_tmp) == ESP_OK) {
+        g_bat_style = style_tmp;
+    }
+    uint8_t pos_tmp = 1;
+    if (nvs_load_u8("bat_pos", &pos_tmp) == ESP_OK) {
+        g_bat_pos = pos_tmp;
+    }
+
+    char url_tmp[128] = {0};
+    if (nvs_load_str("openwrt_url", url_tmp, sizeof(url_tmp)) == ESP_OK && strlen(url_tmp) > 0) {
+        strncpy(g_openwrt_url, url_tmp, sizeof(g_openwrt_url) - 1);
+    }
+
+    if (nvs_load_str("mqtt_url", url_tmp, sizeof(url_tmp)) == ESP_OK) {
+        strncpy(g_mqtt_broker_url, url_tmp, sizeof(g_mqtt_broker_url) - 1);
+    }
+    if (nvs_load_str("mqtt_topic", url_tmp, sizeof(url_tmp)) == ESP_OK && strlen(url_tmp) > 0) {
+        strncpy(g_mqtt_topic, url_tmp, sizeof(g_mqtt_topic) - 1);
+    }
+    if (nvs_load_str("mqtt_user", url_tmp, sizeof(url_tmp)) == ESP_OK) {
+        strncpy(g_mqtt_username, url_tmp, sizeof(g_mqtt_username) - 1);
+    }
+    if (nvs_load_str("mqtt_pwd", url_tmp, sizeof(url_tmp)) == ESP_OK) {
+        strncpy(g_mqtt_password, url_tmp, sizeof(g_mqtt_password) - 1);
+    }
+    
+    // 初始化 MQTT API (必须在加载 NVS 配置之后)
+    mqtt_api_init();
+    
     xTaskCreatePinnedToCore(&touch_button_task, "touch", 4096, NULL, 4, NULL, 1);
     start_webserver();
 
@@ -801,6 +881,10 @@ void app_main(void)
         case WATCH_FACE_OPENWRT:
             draw_openwrt_face(fb);
             break;
+            
+        case WATCH_FACE_MQTT_IMAGE:
+            draw_mqtt_image_face(fb);
+            break;
 
         case WATCH_FACE_SYSTEM:
             draw_system_face(fb);
@@ -811,10 +895,15 @@ void app_main(void)
             break;
         }
 
+        // 统一由 graphics.c 动态计算坐标对齐
+        draw_battery_status(fb, g_bat_pos, g_bat_style);
         draw_fps_counter(fb);
         // 统一刷屏
         graphics_flush_frame(fb);
 
-        vTaskDelay(pdMS_TO_TICKS(40));
+        // 🔋 動態省電幀率控制：充電時 25 FPS (40ms)，電池供電時 1 FPS (1000ms)
+        // 使用 ulTaskNotifyTake 代替 vTaskDelay，確保在 1 FPS 模式下如果發生按鍵等事件，可以被瞬間喚醒！
+        int delay_ms = battery_is_charging() ? 40 : 1000;
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(delay_ms));
     }
 }

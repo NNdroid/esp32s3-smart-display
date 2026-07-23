@@ -21,3 +21,4 @@ void draw_scrolling_string(uint16_t *fb, int x, int y, const char *str, uint16_t
 void draw_fps_counter(uint16_t *fb);
 void draw_cn_char_16x16(uint16_t *fb, int x, int y, const uint8_t *bitmap_data, uint16_t color, uint16_t bg_color);
 void draw_cn_string(uint16_t *fb, int x, int y, const char *str, uint16_t color, uint16_t bg_color);
+void draw_battery_status(uint16_t *fb, int pos, int style);

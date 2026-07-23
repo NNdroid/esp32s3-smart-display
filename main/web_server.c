@@ -5,6 +5,8 @@
 #include "graphics.h"
 #include "env_sensor_drv.h"
 #include "app_actions.h"
+#include "battery.h"
+#include "mqtt_api.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
 #include "psa/crypto.h"
@@ -146,6 +148,10 @@ static esp_err_t api_status_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "temp", g_bme280_data.temperature);
     cJSON_AddNumberToObject(root, "hum", g_bme280_data.humidity_pct);
     cJSON_AddNumberToObject(root, "press", g_bme280_data.pressure_hpa);
+    cJSON_AddBoolToObject(root, "has_sensor", g_bme280_data.sensor_type != SENSOR_TYPE_NONE);
+    cJSON_AddNumberToObject(root, "battery", battery_get_percentage());
+    cJSON_AddNumberToObject(root, "bat_mv", battery_get_voltage_mv());
+    cJSON_AddBoolToObject(root, "mqtt_connected", g_mqtt_connected);
     
     char *resp = cJSON_PrintUnformatted(root);
     httpd_resp_set_type(req, "application/json");
@@ -286,6 +292,114 @@ static esp_err_t api_brightness_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t api_settings_battery_handler(httpd_req_t *req) {
+    if (!verify_token(req)) { 
+        httpd_resp_set_status(req, "401 Unauthorized"); 
+        return httpd_resp_send(req, "", 0); 
+    }
+    
+    char *body = read_http_body(req);
+    if (!body) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
+
+    cJSON *json = cJSON_Parse(body);
+    free(body);
+    
+    if (json) {
+        cJSON *style = cJSON_GetObjectItem(json, "bat_style");
+        cJSON *pos = cJSON_GetObjectItem(json, "bat_pos");
+        
+        if (cJSON_IsNumber(style)) {
+            g_bat_style = style->valueint;
+            nvs_save_u8("bat_style", g_bat_style);
+        }
+        if (cJSON_IsNumber(pos)) {
+            g_bat_pos = pos->valueint;
+            nvs_save_u8("bat_pos", g_bat_pos);
+        }
+        cJSON_Delete(json);
+    }
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"status\":\"ok\"}", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static esp_err_t api_settings_openwrt_handler(httpd_req_t *req) {
+    if (!verify_token(req)) { 
+        httpd_resp_set_status(req, "401 Unauthorized"); 
+        return httpd_resp_send(req, "", 0); 
+    }
+    
+    char *body = read_http_body(req);
+    if (!body) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
+
+    cJSON *json = cJSON_Parse(body);
+    free(body);
+    
+    if (json) {
+        cJSON *url = cJSON_GetObjectItem(json, "url");
+        
+        if (cJSON_IsString(url)) {
+            const char *new_url = url->valuestring;
+            if (strlen(new_url) == 0) {
+                // If empty, use default
+                strncpy(g_openwrt_url, "http://192.168.100.1/traffic.json", sizeof(g_openwrt_url) - 1);
+                nvs_save_str("openwrt_url", "");
+            } else {
+                strncpy(g_openwrt_url, new_url, sizeof(g_openwrt_url) - 1);
+                nvs_save_str("openwrt_url", g_openwrt_url);
+            }
+        }
+        cJSON_Delete(json);
+    }
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"status\":\"ok\"}", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static esp_err_t api_settings_mqtt_handler(httpd_req_t *req) {
+    if (!verify_token(req)) { 
+        httpd_resp_set_status(req, "401 Unauthorized"); 
+        return httpd_resp_send(req, "", 0); 
+    }
+    char *body = read_http_body(req);
+    if (!body) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
+
+    cJSON *json = cJSON_Parse(body);
+    free(body);
+    if (json) {
+        cJSON *url = cJSON_GetObjectItem(json, "url");
+        cJSON *topic = cJSON_GetObjectItem(json, "topic");
+        cJSON *user = cJSON_GetObjectItem(json, "user");
+        cJSON *pwd = cJSON_GetObjectItem(json, "pwd");
+
+        if (cJSON_IsString(url)) {
+            strncpy(g_mqtt_broker_url, url->valuestring, sizeof(g_mqtt_broker_url) - 1);
+            nvs_save_str("mqtt_url", g_mqtt_broker_url);
+        }
+        if (cJSON_IsString(topic)) {
+            strncpy(g_mqtt_topic, topic->valuestring, sizeof(g_mqtt_topic) - 1);
+            nvs_save_str("mqtt_topic", g_mqtt_topic);
+        }
+        if (cJSON_IsString(user)) {
+            strncpy(g_mqtt_username, user->valuestring, sizeof(g_mqtt_username) - 1);
+            nvs_save_str("mqtt_user", g_mqtt_username);
+        }
+        if (cJSON_IsString(pwd)) {
+            strncpy(g_mqtt_password, pwd->valuestring, sizeof(g_mqtt_password) - 1);
+            nvs_save_str("mqtt_pwd", g_mqtt_password);
+        }
+        cJSON_Delete(json);
+        
+        // 动态重连 MQTT 客户端应用新配置
+        mqtt_api_reconnect();
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"status\":\"ok\"}", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
 static esp_err_t api_get_settings_handler(httpd_req_t *req) {
     if (!verify_token(req)) { 
         httpd_resp_set_status(req, "401 Unauthorized"); 
@@ -297,8 +411,9 @@ static esp_err_t api_get_settings_handler(httpd_req_t *req) {
     nvs_load_str("lcd_bright", bright_str, sizeof(bright_str));
 
     // 回傳 JSON
-    char response[64];
-    snprintf(response, sizeof(response), "{\"brightness\":%s}", bright_str);
+    char response[1024];
+    snprintf(response, sizeof(response), "{\"brightness\":%s, \"bat_style\":%d, \"bat_pos\":%d, \"openwrt_url\":\"%s\", \"mqtt_url\":\"%s\", \"mqtt_topic\":\"%s\", \"mqtt_user\":\"%s\"}", 
+        bright_str, g_bat_style, g_bat_pos, g_openwrt_url, g_mqtt_broker_url, g_mqtt_topic, g_mqtt_username);
     
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
@@ -334,6 +449,25 @@ static esp_err_t api_ota_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static void reboot_task(void *arg) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+    vTaskDelete(NULL);
+}
+
+static esp_err_t api_restart_handler(httpd_req_t *req) {
+    if (!verify_token(req)) {
+        httpd_resp_set_status(req, "401 Unauthorized");
+        return httpd_resp_send(req, "", 0);
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"ok\", \"action\":\"restart\"}");
+    
+    xTaskCreate(reboot_task, "reboot", 2048, NULL, 5, NULL);
+    
+    return ESP_OK;
+}
+
 static esp_err_t api_switch_face_handler(httpd_req_t *req) {
     app_action_switch_face();
     httpd_resp_set_type(req, "application/json");
@@ -364,8 +498,12 @@ void start_webserver(void) {
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/reset_wifi", .method=HTTP_POST, .handler=api_reset_wifi_handler});
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/brightness", .method=HTTP_POST, .handler=api_brightness_handler});
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/settings", .method=HTTP_GET, .handler=api_get_settings_handler});
+        httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/settings/battery", .method=HTTP_POST, .handler=api_settings_battery_handler});
+        httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/settings/openwrt", .method=HTTP_POST, .handler=api_settings_openwrt_handler});
+        httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/settings/mqtt", .method=HTTP_POST, .handler=api_settings_mqtt_handler});
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/ota", .method=HTTP_POST, .handler=api_ota_handler});
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/action/switch_face", .method=HTTP_GET, .handler=api_switch_face_handler});
         httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/action/switch_stock", .method=HTTP_GET, .handler=api_switch_stock_handler});
+        httpd_register_uri_handler(s_http_server, &(httpd_uri_t){.uri="/api/action/restart", .method=HTTP_GET, .handler=api_restart_handler});
     }
 }

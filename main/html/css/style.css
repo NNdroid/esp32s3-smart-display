@@ -256,15 +256,34 @@ button:active { transform: translateY(0) scale(0.98); }
 }
 .btn-slate:hover { box-shadow: 0 12px 25px -4px rgba(71, 85, 105, 0.6); }
 
-.control-panel {
+.btn-rose {
+    background: linear-gradient(135deg, #e11d48, #f43f5e);
+    box-shadow: 0 8px 20px -6px rgba(244, 63, 94, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+.btn-rose:hover { box-shadow: 0 12px 25px -4px rgba(244, 63, 94, 0.6); }
+
+.card-panel {
     background: rgba(0, 0, 0, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
-    padding: 18px;
-    margin-top: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    transition: transform 0.2s, background 0.2s;
+}
+.card-panel:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+.card-title {
+    font-size: 14px;
+    color: var(--accent-blue);
+    margin-bottom: 16px;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 /* ==========================================
@@ -272,9 +291,19 @@ button:active { transform: translateY(0) scale(0.98); }
    ========================================== */
 .status-bar {
     display: grid;
-    grid-template-columns: 1fr minmax(0, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 24px;
+}
+
+.status-item:last-child {
+    grid-column: span 2;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.status-item:last-child:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.1));
 }
 
 .status-item {

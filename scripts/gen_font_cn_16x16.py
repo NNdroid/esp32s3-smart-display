@@ -147,7 +147,7 @@ class FontGenerator:
                 hex_code = f"{unicode_code:04X}"
                 f.write(f"const uint8_t font_{hex_code}[32] = {{\n")
             
-                # 【Bug 修复处】：这里加上了 , _ 进行解包，只获取 bitmap 数组
+                # 这里加上了 , _ 进行解包，只获取 bitmap 数组
                 bitmap, _ = self.char_to_bitmap(char)
                 hex_data = self.bitmap_to_hex(bitmap)
             

@@ -4,6 +4,7 @@
 #include "font_cn_16x16.h"
 #include <stdlib.h>
 #include <string.h>
+#include "battery.h"
 
 #include "esp_log.h"
 #include "driver/spi_master.h"
@@ -499,5 +500,94 @@ void draw_cn_string(uint16_t *fb, int x, int y, const char *str, uint16_t color,
             curr_x += 16;
             i += 3;
         }
+    }
+}
+
+// ==========================================
+// 🔋 繪製電池與充電狀態
+// ==========================================
+void draw_battery_status(uint16_t *fb, int pos, int style) {
+    int pct = battery_get_percentage();
+    bool is_charging = battery_is_charging();
+    int x = 0, y = 0;
+
+    if (style == 1) {
+        // 数字模式
+        uint16_t color = COLOR_WHITE;
+        if (is_charging) color = COLOR_GREEN;
+        else if (pct <= 20) color = COLOR_RED;
+        
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d%%", pct);
+        
+        // 动态计算文字宽高 (字体 8x8, scale=1)
+        int text_w = strlen(buf) * 8;
+        int text_h = 8;
+        
+        y = (pos == 0 || pos == 1) ? 5 : 240 - text_h - 5;
+        x = (pos == 0 || pos == 2) ? 5 : 240 - text_w - 5;
+
+        // 使用 1 倍大小的字体
+        draw_string(fb, x, y, buf, color, COLOR_BLACK, 1);
+        return;
+    }
+
+    // 默认图标模式 (style == 0)
+    // 外框参数
+    int bat_w = 22;
+    int bat_h = 8;
+    
+    y = (pos == 0 || pos == 1) ? 5 : 240 - bat_h - 5;
+    x = (pos == 0 || pos == 2) ? 5 : 240 - (bat_w + 3) - 5; // +3 留给正极触点
+    
+    uint16_t frame_color = COLOR_WHITE;
+
+    // 绘制电池主体框架 (上下左右四条边)
+    // 上边
+    draw_line(fb, x, y, x + bat_w, y, frame_color);
+    // 下边
+    draw_line(fb, x, y + bat_h, x + bat_w, y + bat_h, frame_color);
+    // 左边
+    draw_line(fb, x, y, x, y + bat_h, frame_color);
+    // 右边
+    draw_line(fb, x + bat_w, y, x + bat_w, y + bat_h, frame_color);
+
+    // 绘制电池正极触点
+    draw_line(fb, x + bat_w + 1, y + 3, x + bat_w + 1, y + bat_h - 3, frame_color);
+    draw_line(fb, x + bat_w + 2, y + 3, x + bat_w + 2, y + bat_h - 3, frame_color);
+
+    // 绘制填充电量
+    // 内边距 2 个像素，实际填充最大宽度 bat_w - 3
+    int fill_max_w = bat_w - 3;
+    int fill_w = (pct * fill_max_w) / 100;
+    if (fill_w < 0) fill_w = 0;
+    if (fill_w > fill_max_w) fill_w = fill_max_w;
+
+    uint16_t fill_color = (pct > 20) ? COLOR_GREEN : COLOR_RED;
+    
+    // 如果大于0，才填充
+    if (fill_w > 0) {
+        // 画实心矩形(通过逐行画线实现)
+        for (int i = y + 2; i <= y + bat_h - 2; i++) {
+            draw_line(fb, x + 2, i, x + 2 + fill_w - 1, i, fill_color);
+        }
+    }
+
+    // 如果在充电，画一个黄色小闪电
+    if (is_charging) {
+        uint16_t lightning_color = COLOR_YELLOW;
+        // 闪电中心坐标
+        int cx = x + bat_w / 2;
+        int cy = y + bat_h / 2;
+        
+        // 简单的闪电折线(缩小版适配 bat_h=8)
+        draw_line(fb, cx + 2, cy - 3, cx - 1, cy, lightning_color);
+        draw_line(fb, cx - 1, cy, cx + 2, cy, lightning_color);
+        draw_line(fb, cx + 2, cy, cx - 2, cy + 3, lightning_color);
+        
+        // 加粗
+        draw_line(fb, cx + 3, cy - 3, cx, cy, lightning_color);
+        draw_line(fb, cx, cy, cx + 3, cy, lightning_color);
+        draw_line(fb, cx + 3, cy, cx - 1, cy + 3, lightning_color);
     }
 }

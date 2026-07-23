@@ -11,9 +11,6 @@
 
 static const char *TAG = "OPENWRT_API";
 
-// 💡 務必確認這是你路由器的真實 IP！
-// 如果你的路由器允許 http (port 80)，強烈建議把 https 改成 http，速度快一倍且不耗記憶體！
-#define OPENWRT_JSON_URL   "http://192.168.100.1/traffic.json" 
 #define FETCH_INTERVAL_MS  1500
 
 openwrt_data_t g_openwrt_data = {
@@ -123,8 +120,8 @@ static void fetch_openwrt_task(void *pvParameters) {
         }
 
         esp_http_client_config_t config = {
-            .url = OPENWRT_JSON_URL,
-            .timeout_ms = 2000,
+            .url = g_openwrt_url,
+            .timeout_ms = 3000,
             .event_handler = _openwrt_http_event_handler,
             
             // 忽略 HTTPS 自簽發憑證的嚴格驗證，防止底層握手報錯斷開！

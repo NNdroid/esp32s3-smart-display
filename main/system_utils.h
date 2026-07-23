@@ -1,6 +1,7 @@
 #pragma once
 #include <esp_err.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 static inline int min_int(int a, int b) {
     return (a < b) ? a : b;
@@ -13,5 +14,6 @@ void load_current_face_from_nvs(void);
 void save_current_face_to_nvs(void);
 void wifi_init_basics(void);
 void wait_for_wifi_connection(void);
+bool is_wifi_connected(void);
 void refresh_wifi_status(void);
 void sync_time_sntp(void);

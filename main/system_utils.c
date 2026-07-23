@@ -69,9 +69,8 @@ void load_current_face_from_nvs(void) {
     if (nvs_open("sys_cfg", NVS_READONLY, &handle) == ESP_OK) {
         uint8_t face_id = 0;
         if (nvs_get_u8(handle, "face_id", &face_id) == ESP_OK) {
-            // ⚠️ 防呆校驗：假設你目前只有 3 個表盤 (0, 1, 2)
-            // 如果從 NVS 讀出了大於 2 的非法數值（比如未初始化過的是 255），強制復位為 0
-            if (face_id < 3) {
+            // ⚠️ 防呆校驗：使用動態的最大表盤數量進行檢查
+            if (face_id < WATCH_FACE_MAX) {
                 g_current_face = (int)face_id;
                 ESP_LOGI("NVS", "✅ 成功從 NVS 載入上次表盤 ID: [%d]", g_current_face);
             } else {
@@ -172,6 +171,11 @@ void wait_for_wifi_connection(void) {
     ESP_LOGI(TAG, "等待 Wi-Fi 連線...");
     xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
     refresh_wifi_status();
+}
+
+bool is_wifi_connected(void) {
+    if (s_wifi_event_group == NULL) return false;
+    return (xEventGroupGetBits(s_wifi_event_group) & WIFI_CONNECTED_BIT) != 0;
 }
 
 void refresh_wifi_status(void) {
